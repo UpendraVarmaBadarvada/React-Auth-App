@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Container, TextField, Button, Typography, InputAdornment } from "@mui/material";
+import { Container, TextField, Button, Typography, InputAdornment, Snackbar, Alert } from "@mui/material";
 import { CheckCircle } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 import "../App.css";
 
 const AuthForm = () => {
@@ -15,27 +16,80 @@ const AuthForm = () => {
     contactInfo: "",
   });
   const [errors, setErrors] = useState({});
+  const [alert, setAlert] = useState({ open: false, message: "", severity: "success" });
+  const navigate = useNavigate();
 
   const validate = () => {
     let newErrors = {};
-    Object.keys(formData).forEach((key) => {
-      if (!formData[key].trim()) {
-          newErrors[key] = "This field is required";
+    if(isRegister){
+      Object.keys(formData).forEach((key) => {
+        if (!formData[key].trim()) {
+            newErrors[key] = "This field is required";
+          }
+      });
+      if (formData.password && formData.confirmPassword) {
+        if (formData.password !== formData.confirmPassword) {
+          newErrors.confirmPassword = "Passwords do not match";
         }
-    });
-    if (isRegister && formData.password && formData.confirmPassword) {
-      if (formData.password !== formData.confirmPassword) {
-        newErrors.confirmPassword = "Passwords do not match";
       }
     }
+    else{
+      Object.keys(formData).forEach((key) => {
+        if ((key == "userId" || key == "password") && !formData[key].trim()) {
+            newErrors[key] = "This field is required";
+          }
+      });
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (validate()) {
-      alert(isRegister ? "Registered Successfully!" : "Login Successful!");
+      if (isRegister) {
+        try {
+          const response = await fetch("http://localhost:5000/api/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(formData),
+          });
+          const data = await response.json();
+          if (response.ok) {
+            setAlert({ open: true, message: "Registration Successful!", severity: "success" });
+            setFormData({
+              userId: "",
+              password: "",
+              confirmPassword: "",
+              firstName: "",
+              lastName: "",
+              address: "",
+              contactInfo: "",
+            });
+          } else {
+            setAlert({ open: true, message: data.message || "Registration Failed!", severity: "error" });
+          }
+        } catch (error) {
+          setAlert({ open: true, message: "An error occurred. Please try again.", severity: "error" });
+        }
+      } else {
+        try {
+          const response = await fetch("http://localhost:5000/api/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId: formData.userId, password: formData.password }),
+          });
+          const data = await response.json();
+          if (response.ok) {
+            navigate(`/success/${formData.userId}`);
+          } else {
+            setAlert({ open: true, message: data.message || "Login Failed!", severity: "error" });
+          }
+        } catch (error) {
+          setAlert({ open: true, message: "An error occurred. Please try again.", severity: "error" });
+        }
+      }
     }
   };
 
@@ -156,6 +210,20 @@ const AuthForm = () => {
             {isRegister ? "Switch to Login" : "Switch to Register"}
           </Button>
         </form>
+        <Snackbar open={alert.open} autoHideDuration={3000} onClose={() => setAlert({ ...alert, open: false })}
+          anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        >
+          <Alert severity={alert.severity}
+            onClose={() => setAlert({ ...alert, open: false })}
+            sx={{
+              width: "100%",
+              fontSize: "1.2rem", // Larger font size
+              padding: "20px", // Add padding for a bigger alert
+            }}
+          >
+            {alert.message}
+          </Alert>
+        </Snackbar>
       </Container>
     </div>
   );
